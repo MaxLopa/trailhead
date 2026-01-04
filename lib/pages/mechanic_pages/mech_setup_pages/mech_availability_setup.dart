@@ -56,11 +56,26 @@ class _MechAvailabilitySetupPageState extends State<MechAvailabilitySetupPage> {
 
   late Map<int, List<TimeRange>> _draftDays;
   final List<WeeklyAvailability> _savedWeeks = [];
+  final List<WkOverride> _overrides = [];
   int? _defaultWeekIndex;
-
   int? _selectedWeekday;
+  bool _initialized = false;
 
   bool _initializedFromProvider = false;
+
+  // Calendar State
+  DateTime _viewDate = DateTime.now();
+  DateTime? _rangeStart;
+  DateTime? _rangeEnd;
+  int? _selectedOverrideScheduleIndex;
+
+  final List<Color> _overrideColors = [
+    Colors.orange.shade300,
+    Colors.teal.shade300,
+    Colors.purple.shade300,
+    Colors.pink.shade300,
+    Colors.amber.shade300,
+  ];
 
   @override
   void initState() {
@@ -119,16 +134,21 @@ class _MechAvailabilitySetupPageState extends State<MechAvailabilitySetupPage> {
     return MainLayout(
       bodyWidget: Scaffold(
         appBar: AppBar(title: const Text('Mechanic Availability Setup')),
-        body: Padding(
-          padding: EdgeInsets.all(gap),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(width: half, child: _buildLeftPane(gap)),
-              SizedBox(width: gap),
-              SizedBox(width: half, child: _buildRightPane(gap)),
-            ],
-          ),
+        body: Column(
+          children: [
+            Padding(
+              padding: EdgeInsets.all(gap),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(width: half, child: _buildLeftPane(gap)),
+                  SizedBox(width: gap),
+                  SizedBox(width: half, child: _buildRightPane(gap)),
+                ],
+              ),
+            ),
+            // _buildCalendarOverrideSection(gap),
+          ],
         ),
       ),
     );
@@ -454,7 +474,7 @@ class _MechAvailabilitySetupPageState extends State<MechAvailabilitySetupPage> {
     _clearEditorFields(keepSelection: false);
   }
 
-    // Load a preset into the current draft so user can tweak + save as their own.
+  // Load a preset into the current draft so user can tweak + save as their own.
   void _loadPresetIntoEditor(WeeklyAvailability preset) {
     final cloned = <int, List<TimeRange>>{};
     for (var day = 1; day <= 7; day++) {
@@ -685,8 +705,8 @@ class _MechAvailabilitySetupPageState extends State<MechAvailabilitySetupPage> {
   }
 
   void _onSavePressed(MechProvider provider, MechRepository repo) {
-    if ((_defaultWeekIndex! < 0 ||
-        _defaultWeekIndex! >= _savedWeeks.length) && _savedWeeks.isNotEmpty) {
+    if ((_defaultWeekIndex! < 0 || _defaultWeekIndex! >= _savedWeeks.length) &&
+        _savedWeeks.isNotEmpty) {
       _snack('Select a default schedule before saving.');
       return;
     }
@@ -1028,5 +1048,226 @@ class _MechAvailabilitySetupPageState extends State<MechAvailabilitySetupPage> {
 
   void _snack(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  // ===== CALENDAR SECTION =====
+  Widget _buildCalendarOverrideSection(double gap) {
+    if (_defaultWeekIndex == null) {
+      return const Card(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Center(
+            child: Text(
+              "Select a Default Template to enable calendar overrides",
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Card(
+      child: Padding(
+        padding: EdgeInsets.all(gap),
+        child: Column(
+          children: [
+            _buildCalendarHeader(),
+            const Divider(),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(flex: 3, child: _buildCalendarGrid()),
+                SizedBox(width: gap),
+                Expanded(flex: 1, child: _buildOverrideControls()),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCalendarGrid() {
+    final daysInMonth = DateTime(_viewDate.year, _viewDate.month + 1, 0).day;
+    final firstWeekday = DateTime(_viewDate.year, _viewDate.month, 1).weekday;
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 7,
+        childAspectRatio: 1.1,
+      ),
+      itemCount: daysInMonth + (firstWeekday - 1),
+      itemBuilder: (context, index) {
+        if (index < firstWeekday - 1) return const SizedBox.shrink();
+        final day = index - (firstWeekday - 2);
+        final date = DateTime(_viewDate.year, _viewDate.month, day);
+
+        final isSelected =
+            _rangeStart != null &&
+            _rangeEnd != null &&
+            (date.isAfter(_rangeStart!.subtract(const Duration(seconds: 1))) &&
+                date.isBefore(_rangeEnd!.add(const Duration(days: 1))));
+
+        WkOverride? activeOverride;
+        for (var o in _overrides) {
+          if ((date.isAfter(o.startException) ||
+                  date.isAtSameMomentAs(o.startException)) &&
+              (date.isBefore(o.endException) ||
+                  date.isAtSameMomentAs(o.endException))) {
+            activeOverride = o;
+            break;
+          }
+        }
+
+        return InkWell(
+          onTap: () => _onCalendarDayTap(date),
+          child: Container(
+            margin: const EdgeInsets.all(2),
+            decoration: BoxDecoration(
+              color:
+                  isSelected
+                      ? Colors.blue.withOpacity(0.3)
+                      : (activeOverride != null
+                          ? Color(activeOverride.colorValue).withOpacity(0.2)
+                          : Colors.white),
+              border: Border.all(
+                color: isSelected ? Colors.blue : Colors.grey.shade300,
+              ),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Column(
+              children: [
+                Text(
+                  "$day",
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const Spacer(),
+                _buildDaySummary(date, activeOverride),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDaySummary(DateTime date, WkOverride? override) {
+    final sched = override?.overrideSchedule ?? _savedWeeks[_defaultWeekIndex!];
+    final ranges = sched[date.weekday];
+    if (ranges.isEmpty)
+      return const Text(
+        "Off",
+        style: TextStyle(fontSize: 8, color: Colors.grey),
+      );
+    return Text("${ranges.length} slots", style: const TextStyle(fontSize: 8));
+  }
+
+  void _onCalendarDayTap(DateTime date) {
+    setState(() {
+      if (_rangeStart == null || (_rangeStart != null && _rangeEnd != null)) {
+        _rangeStart = date;
+        _rangeEnd = null;
+      } else {
+        if (date.isBefore(_rangeStart!)) {
+          _rangeEnd = _rangeStart;
+          _rangeStart = date;
+        } else {
+          _rangeEnd = date;
+        }
+      }
+    });
+  }
+
+  void _addOverride() {
+    if (_rangeStart == null || _selectedOverrideScheduleIndex == null) return;
+    final end = _rangeEnd ?? _rangeStart!;
+    final color =
+        _overrideColors[_overrides.length % _overrideColors.length].value;
+
+    setState(() {
+      _overrides.add(
+        WkOverride(
+          _savedWeeks[_selectedOverrideScheduleIndex!],
+          _rangeStart!,
+          end,
+          colorValue: color,
+        ),
+      );
+      _rangeStart = null;
+      _rangeEnd = null;
+    });
+  }
+
+  // UI Components
+  Widget _buildCalendarHeader() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        IconButton(
+          icon: const Icon(Icons.chevron_left),
+          onPressed:
+              () => setState(() {
+                _viewDate = DateTime(_viewDate.year, _viewDate.month - 1);
+                _initCalendarData();
+              }),
+        ),
+        Text(
+          "${_viewDate.year} - ${_viewDate.month}",
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        IconButton(
+          icon: const Icon(Icons.chevron_right),
+          onPressed:
+              () => setState(() {
+                _viewDate = DateTime(_viewDate.year, _viewDate.month + 1);
+                _initCalendarData();
+              }),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildOverrideControls() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text("Override", style: TextStyle(fontWeight: FontWeight.bold)),
+        Text(
+          _rangeStart == null
+              ? "Select days..."
+              : "${_rangeStart!.day} to ${_rangeEnd?.day ?? '...'}",
+        ),
+        DropdownButton<int>(
+          isExpanded: true,
+          value: _selectedOverrideScheduleIndex,
+          hint: const Text("Template"),
+          items: List.generate(
+            _savedWeeks.length,
+            (i) =>
+                DropdownMenuItem(value: i, child: Text(_savedWeeks[i].title)),
+          ),
+          onChanged: (v) => setState(() => _selectedOverrideScheduleIndex = v),
+        ),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton(
+            onPressed: _addOverride,
+            child: const Text("Apply"),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _initCalendarData() {
+    final mech = context.read<MechProvider>().mech;
+    // Fix: Ensure widget is still active before running logic that triggers builds
+    if (mounted && mech != null && _defaultWeekIndex != null) {
+      mech.availability.initMonth(_viewDate);
+    }
   }
 }

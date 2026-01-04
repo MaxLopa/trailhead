@@ -77,7 +77,7 @@ class JobRepository {
     if (!doc.exists) {
       throw Exception('Job not found');
     }
-    return Job.fromDoc(doc);
+    return Job.fromMap(doc.data()!);
   }
 
   /// Watch a job in real-time.
@@ -86,7 +86,7 @@ class JobRepository {
       if (!snap.exists) {
         throw Exception('Job deleted');
       }
-      return Job.fromDoc(snap);
+      return Job.fromMap(snap.data()!);
     });
   }
 
@@ -145,7 +145,7 @@ class JobRepository {
     }
 
     final snap = await q.get();
-    return snap.docs.map(Job.fromDoc).toList();
+    return snap.docs.map((doc) => Job .fromMap(doc.data())).toList();
   }
 
   /// Delete a job (use with caution).

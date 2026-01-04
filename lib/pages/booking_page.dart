@@ -3,11 +3,92 @@ import 'package:provider/provider.dart';
 
 import 'package:app1/pages/home_page.dart';
 import 'package:app1/models/service_options.dart';
-import 'package:app1/provider/service_provider.dart';
 import 'package:app1/repositories/job_repository.dart';
 import 'package:app1/models/user_model.dart';
 import 'package:app1/models/timeslot_model.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+
+// =====================
+// Hand-drawn theme bits
+// =====================
+
+const Color kPaper = Color.fromARGB(255, 255, 255, 255);
+const Color kPaper2 = Color.fromARGB(255, 255, 255, 255);
+const Color kInk = Color(0xFF1A1A1A);
+
+class PencilPanel extends StatelessWidget {
+  final Widget child;
+  final EdgeInsets padding;
+  final bool expanded;
+  final bool drawTop, drawRight, drawBottom, drawLeft;
+
+  const PencilPanel({
+    super.key,
+    required this.child,
+    this.padding = const EdgeInsets.all(12),
+    this.expanded = true,
+    this.drawTop = true,
+    this.drawRight = true,
+    this.drawBottom = true,
+    this.drawLeft = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, c) {
+        final w =
+            c.maxWidth.isFinite
+                ? c.maxWidth
+                : MediaQuery.of(context).size.width;
+        final h = expanded ? null : (c.maxHeight.isFinite ? c.maxHeight : 120.0);
+
+        // PencilBox / PencilLine / DrawnButton come from your existing codebase
+        // (you already use them in MainLayout/HomePage).
+        return PencilBox(
+          width: w,
+          height: h ?? (c.maxHeight.isFinite ? c.maxHeight : 120.0),
+          padding: padding,
+          expanded: expanded,
+          wobbleHeight: 8,
+          strokeWidth: 2,
+          color: kInk,
+          drawTop: drawTop,
+          drawRight: drawRight,
+          drawBottom: drawBottom,
+          drawLeft: drawLeft,
+          child: DecoratedBox(
+            decoration: const BoxDecoration(color: kPaper2),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+}
+
+class PencilVSeparator extends StatelessWidget {
+  final double height;
+  const PencilVSeparator({super.key, this.height = 44});
+
+  @override
+  Widget build(BuildContext context) {
+    return RotatedBox(
+      quarterTurns: 1,
+      child: PencilLine(width: height, height: 8, color: Colors.black87),
+    );
+  }
+}
+
+class PencilHSeparator extends StatelessWidget {
+  final double width;
+  const PencilHSeparator({super.key, required this.width});
+
+  @override
+  Widget build(BuildContext context) {
+    return PencilLine(width: width, height: 10, color: Colors.black87);
+  }
+}
 
 class BookingPage extends StatefulWidget {
   final List<Genre> allGenres;
@@ -25,7 +106,6 @@ class BookingPage extends StatefulWidget {
       genres = const [];
     }
 
-    // Fallback to dev dummy genres if Firestore is empty or fails
     if (genres.isEmpty) {
       genres = _devDummyGenres;
     }
@@ -44,8 +124,8 @@ class _BookingPageState extends State<BookingPage> {
   Genre? _selectedGenre;
   ServiceType? _selectedServiceType;
   String? _selectedBrand;
-  DateTime? _selectedDate; // null = "any day" for now
-  String? _selectedTime; // null = "any time"
+  DateTime? _selectedDate; // null = any day
+  String? _selectedTime; // null = any time
 
   // Search results
   List<Mech> _availableMechs = <Mech>[];
@@ -55,17 +135,10 @@ class _BookingPageState extends State<BookingPage> {
   List<ServiceType> get _availableServiceTypes =>
       _selectedGenre?.serviceTypes ?? const <ServiceType>[];
 
-  // Use the generic genre's applicableBrands; service types are generic and don't hold brands.
   List<String> get _availableBrands =>
       _selectedGenre?.applicableBrands ?? const <String>[];
 
-  // Brand is only required if the genre actually has applicable brands.
   bool get _brandRequired => _availableBrands.isNotEmpty;
-
-  bool get _hasCompleteSelection =>
-      _selectedGenre != null &&
-      _selectedServiceType != null &&
-      (!_brandRequired || _selectedBrand != null);
 
   // ===== Availability helpers =====
 
@@ -88,18 +161,17 @@ class _BookingPageState extends State<BookingPage> {
   }
 
   List<TimeRange> _getSlotsForDate(Mech mech, DateTime date) {
-    final schedule = mech.defaultWeek;
+    final schedule = mech.availability.getSchedule();
     if (schedule == null) return const <TimeRange>[];
 
     final weekday = date.weekday; // 1=Mon ... 7=Sun
-    return schedule.days[weekday] ?? const <TimeRange>[];
+    return schedule[weekday] ?? const <TimeRange>[];
   }
 
   bool _isAvailableFor(Mech mech, DateTime date, int? latestTimeMinutes) {
     final slots = _getSlotsForDate(mech, date);
     if (slots.isEmpty) return false;
 
-    // No time given -> any slot on that date works
     if (latestTimeMinutes == null) return true;
 
     for (final range in slots) {
@@ -114,7 +186,7 @@ class _BookingPageState extends State<BookingPage> {
 
   int _earliestAvailableStart(Mech mech, DateTime date) {
     final slots = _getSlotsForDate(mech, date);
-    if (slots.isEmpty) return 24 * 60; // end of day
+    if (slots.isEmpty) return 24 * 60;
     return slots
         .map((r) => _timeStringToMinutes(r.start))
         .reduce((a, b) => a < b ? a : b);
@@ -122,27 +194,28 @@ class _BookingPageState extends State<BookingPage> {
 
   @override
   Widget build(BuildContext context) {
-    final gap = 16.0;
+    const gap = 16.0;
 
     return MainLayout(
       bodyWidget: Scaffold(
-        appBar: AppBar(title: const Text('Find a Mechanic')),
+        backgroundColor: kPaper,
+        appBar: AppBar(
+          title: const Text('Find a Mechanic'),
+          backgroundColor: kPaper,
+          elevation: 0,
+          foregroundColor: kInk,
+        ),
         body: Padding(
-          padding: EdgeInsets.all(gap),
+          padding: const EdgeInsets.all(gap),
           child: Column(
             children: [
-              // Airbnb-style search bar
               _buildSearchBar(context),
               const SizedBox(height: 12),
-
-              // Main split view: left results, right map
               Expanded(
                 child: Row(
                   children: [
-                    // Left: results list
                     Expanded(flex: 3, child: _buildResultsPane()),
                     const SizedBox(width: 12),
-                    // Right: map / location card
                     Expanded(flex: 2, child: _buildMapPane()),
                   ],
                 ),
@@ -157,13 +230,11 @@ class _BookingPageState extends State<BookingPage> {
   // ===== Top search bar =====
 
   Widget _buildSearchBar(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+    return SizedBox(
+      height: 86,
+      child: PencilPanel(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        expanded: true,
         child: Row(
           children: [
             // Category
@@ -198,7 +269,11 @@ class _BookingPageState extends State<BookingPage> {
                 ),
               ),
             ),
-            _divider(),
+
+            const SizedBox(width: 6),
+            const PencilVSeparator(height: 48),
+            const SizedBox(width: 6),
+
             // Service type
             Expanded(
               flex: 3,
@@ -233,7 +308,11 @@ class _BookingPageState extends State<BookingPage> {
                 ),
               ),
             ),
-            _divider(),
+
+            const SizedBox(width: 6),
+            const PencilVSeparator(height: 48),
+            const SizedBox(width: 6),
+
             // Brand
             Expanded(
               flex: 3,
@@ -275,14 +354,17 @@ class _BookingPageState extends State<BookingPage> {
                 ),
               ),
             ),
-            _divider(),
+
+            const SizedBox(width: 6),
+            const PencilVSeparator(height: 48),
+            const SizedBox(width: 6),
+
             // Date
             Expanded(
               flex: 2,
               child: _searchSegment(
                 label: 'Date',
                 child: InkWell(
-                  borderRadius: BorderRadius.circular(999),
                   onTap: () => _pickDate(context),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
@@ -298,13 +380,6 @@ class _BookingPageState extends State<BookingPage> {
                             _selectedDate == null
                                 ? 'Any day'
                                 : _formatDate(_selectedDate!),
-                            style: TextStyle(
-                              fontSize: 13,
-                              color:
-                                  _selectedDate == null
-                                      ? Colors.grey.shade600
-                                      : theme.textTheme.bodyMedium?.color,
-                            ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -314,7 +389,11 @@ class _BookingPageState extends State<BookingPage> {
                 ),
               ),
             ),
-            _divider(),
+
+            const SizedBox(width: 6),
+            const PencilVSeparator(height: 48),
+            const SizedBox(width: 6),
+
             // Time (typed)
             Expanded(
               flex: 2,
@@ -334,18 +413,20 @@ class _BookingPageState extends State<BookingPage> {
                 ),
               ),
             ),
-            const SizedBox(width: 8),
-            // Search button
-            FilledButton.icon(
-              onPressed: _isSearching ? null : () => _onSubmitBooking(context),
-              icon: const Icon(Icons.search),
-              label: const Text('Search'),
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                shape: const StadiumBorder(),
+
+            const SizedBox(width: 10),
+
+            // Search button (drawn)
+            DrawnButton(
+              size: const Size(110, 34),
+              onClick: _isSearching ? null : () => _onSubmitBooking(context),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  Icon(Icons.search, size: 16),
+                  SizedBox(width: 6),
+                  Text('Search'),
+                ],
               ),
             ),
           ],
@@ -356,7 +437,7 @@ class _BookingPageState extends State<BookingPage> {
 
   Widget _searchSegment({required String label, required Widget child}) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -364,18 +445,19 @@ class _BookingPageState extends State<BookingPage> {
             label,
             style: const TextStyle(
               fontSize: 10,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w800,
               letterSpacing: 0.3,
+              color: kInk,
             ),
           ),
-          child,
+          DefaultTextStyle.merge(
+            style: const TextStyle(color: kInk),
+            child: child,
+          ),
         ],
       ),
     );
   }
-
-  Widget _divider() =>
-      Container(width: 1, height: 40, color: Colors.grey.shade300);
 
   // ===== Left pane: results / summary =====
 
@@ -383,17 +465,23 @@ class _BookingPageState extends State<BookingPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
+        const Text(
           'Search results',
           style: TextStyle(
             fontSize: 14,
-            fontWeight: FontWeight.w700,
-            color: Colors.grey.shade800,
+            fontWeight: FontWeight.w900,
+            color: kInk,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
+        LayoutBuilder(
+          builder: (context, c) => PencilHSeparator(width: c.maxWidth),
+        ),
+        const SizedBox(height: 10),
+
         _selectionSummary(),
         const SizedBox(height: 12),
+
         Expanded(
           child:
               _isSearching
@@ -405,7 +493,7 @@ class _BookingPageState extends State<BookingPage> {
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.grey.shade700,
+                        color: Colors.black.withOpacity(0.65),
                       ),
                     ),
                   )
@@ -416,7 +504,8 @@ class _BookingPageState extends State<BookingPage> {
                           'Available at selected time',
                           style: TextStyle(
                             fontSize: 13,
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w900,
+                            color: kInk,
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -440,18 +529,30 @@ class _BookingPageState extends State<BookingPage> {
                       ],
                       if (_availableMechs.isNotEmpty && _otherMechs.isNotEmpty)
                         Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          child: Row(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          child: Column(
                             children: [
-                              Expanded(child: Divider()),
-                              const Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 8),
-                                child: Text(
-                                  'Other mechanics (not available at this time)',
-                                  style: TextStyle(fontSize: 12),
-                                ),
+                              LayoutBuilder(
+                                builder:
+                                    (context, c) =>
+                                        PencilHSeparator(width: c.maxWidth),
                               ),
-                              Expanded(child: Divider()),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Other mechanics (not available at this time)',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.black.withOpacity(0.75),
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 8),
+                              LayoutBuilder(
+                                builder:
+                                    (context, c) =>
+                                        PencilHSeparator(width: c.maxWidth),
+                              ),
                             ],
                           ),
                         ),
@@ -489,28 +590,32 @@ class _BookingPageState extends State<BookingPage> {
         _selectedDate != null ? _formatDate(_selectedDate!) : 'Any day';
     final time = _selectedTime ?? 'Any time';
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.blueGrey.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.blueGrey.shade100),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Current Selection',
-            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+    return SizedBox(
+      height: 140,
+      child: PencilPanel(
+        padding: const EdgeInsets.all(12),
+        child: SingleChildScrollView(
+          physics: const NeverScrollableScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Current Selection',
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  fontSize: 13,
+                  color: kInk,
+                ),
+              ),
+              const SizedBox(height: 8),
+              _summaryRow(label: 'Category', value: genre),
+              _summaryRow(label: 'Service', value: st),
+              _summaryRow(label: 'Brand', value: brand),
+              _summaryRow(label: 'Date', value: date),
+              _summaryRow(label: 'Time', value: time),
+            ],
           ),
-          const SizedBox(height: 8),
-          _summaryRow(label: 'Category', value: genre),
-          _summaryRow(label: 'Service', value: st),
-          _summaryRow(label: 'Brand', value: brand),
-          _summaryRow(label: 'Date', value: date),
-          _summaryRow(label: 'Time', value: time),
-        ],
+        ),
       ),
     );
   }
@@ -525,7 +630,11 @@ class _BookingPageState extends State<BookingPage> {
             width: 70,
             child: Text(
               '$label:',
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: kInk,
+              ),
             ),
           ),
           Expanded(
@@ -533,7 +642,8 @@ class _BookingPageState extends State<BookingPage> {
               value,
               style: TextStyle(
                 fontSize: 12,
-                color: isMissing ? Colors.grey.shade600 : Colors.black,
+                color: isMissing ? Colors.black.withOpacity(0.55) : kInk,
+                fontWeight: isMissing ? FontWeight.w600 : FontWeight.w700,
               ),
             ),
           ),
@@ -545,49 +655,44 @@ class _BookingPageState extends State<BookingPage> {
   // ===== Right pane: map card =====
 
   Widget _buildMapPane() {
-    return Card(
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Stack(
-          children: [
-            Container(
-              color: Colors.blueGrey.shade100.withOpacity(0.5),
-              alignment: Alignment.center,
-              child: Icon(
-                Icons.map_outlined,
-                size: 80,
-                color: Colors.blueGrey.shade400,
-              ),
+    return PencilPanel(
+      padding: const EdgeInsets.all(10),
+      child: Stack(
+        children: [
+          Center(
+            child: Icon(
+              Icons.map_outlined,
+              size: 88,
+              color: Colors.black.withOpacity(0.25),
             ),
-            Positioned(
-              top: 12,
-              left: 12,
-              right: 12,
-              child: Container(
+          ),
+          Align(
+            alignment: Alignment.topCenter,
+            child: SizedBox(
+              height: 30,
+              child: PencilPanel(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
-                  vertical: 6,
+                  vertical: 4,
                 ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.9),
-                  borderRadius: BorderRadius.circular(999),
-                ),
+                drawBottom: false,
+                drawLeft: false,
+                drawRight: false,
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: const [
                     Icon(Icons.place, size: 16),
                     SizedBox(width: 6),
                     Text(
                       'Map preview (mechanic locations coming soon)',
-                      style: TextStyle(fontSize: 11),
+                      style: TextStyle(fontSize: 11, color: kInk),
                     ),
                   ],
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -601,21 +706,17 @@ class _BookingPageState extends State<BookingPage> {
 
     final base = '${_selectedGenre!.name} · ${_selectedServiceType!.name}';
 
-    if (!_brandRequired) {
-      return '$base • Any brand';
-    }
-    if (_selectedBrand == null) {
-      return base;
-    }
-    return '$base • ${_selectedBrand}';
+    if (!_brandRequired) return '$base • Any brand';
+    if (_selectedBrand == null) return base;
+    return '$base • $_selectedBrand';
   }
 
   String _summarizeAvailability(Mech mech) {
-    if (mech.defaultWeek != null) {
-      return 'Availability: ${mech.defaultWeek!.title}';
+    if (mech.availability.getSchedule() != null) {
+      return 'Availability: ${mech.availability.getSchedule().title}';
     }
-    if (mech.availabilities.isNotEmpty) {
-      return 'Availability: ${mech.availabilities.first.title}';
+    if (mech.availability.getSchedule().days.isNotEmpty) {
+      return 'Availability: ${mech.availability.getSchedule().title}';
     }
     return 'Availability varies';
   }
@@ -630,9 +731,7 @@ class _BookingPageState extends State<BookingPage> {
       lastDate: now.add(const Duration(days: 90)),
     );
     if (picked != null) {
-      setState(() {
-        _selectedDate = picked;
-      });
+      setState(() => _selectedDate = picked);
     }
   }
 
@@ -654,28 +753,27 @@ class _BookingPageState extends State<BookingPage> {
     });
 
     try {
-      final hasSpecificDate = _selectedDate != null;
-
       final brandForQuery = _brandRequired ? _selectedBrand! : '';
-
       final jobRepo = JobRepository();
 
-      // First-level query: service indices (genre, serviceType, brand).
       final mechRefs = await jobRepo.queryIndiciesWithOptions(
         _selectedGenre!.name,
         _selectedServiceType!.name,
         brandForQuery,
       );
+      final mechs = <Mech>[];
+      for (final mechRef in mechRefs) {
+        final snap = await mechRef.get();
+        if (snap.exists) {
+          final data = snap.data() as Map<String, dynamic>;
+          final userRef = data['userRef'] as DocumentReference?;
+          if (userRef == null) {
+            throw 'Mechanic index missing userRef field';
+          }
 
-      // Load full Mech docs from refs.
-      final mechSnapshots = await Future.wait(mechRefs.map((ref) => ref.get()));
-
-      final mechs =
-          mechSnapshots.where((snap) => snap.exists).map((snap) {
-            final data = snap.data() as Map<String, dynamic>;
-            final userRef = data['userRef'] as DocumentReference?;
-            return Mech.fromMap(data, userRef ?? snap.reference);
-          }).toList();
+          mechs.add(Mech.fromMap(data, mechRef));
+        }
+      }
 
       final selectedTimeMinutes = _parseSelectedTimeToMinutes(_selectedTime);
 
@@ -691,7 +789,6 @@ class _BookingPageState extends State<BookingPage> {
           }
         }
 
-        // sort available by earliest slot
         available.sort(
           (a, b) => _earliestAvailableStart(
             a,
@@ -699,10 +796,8 @@ class _BookingPageState extends State<BookingPage> {
           ).compareTo(_earliestAvailableStart(b, _selectedDate!)),
         );
 
-        // sort others by name (or whatever)
         other.sort((a, b) => a.name.compareTo(b.name));
       } else {
-        // No date → everyone goes into available list, no separator section
         available = mechs;
       }
 
@@ -711,28 +806,11 @@ class _BookingPageState extends State<BookingPage> {
         _otherMechs = other;
       });
 
-      final brandText = _brandRequired ? _selectedBrand : 'N/A';
-      final dateText =
-          hasSpecificDate ? _formatDate(_selectedDate!) : 'Any day';
-      final timeText = _selectedTime ?? 'Any time';
-
-      final msg =
-          'Found ${mechs.length} mechanics for:\n'
-          '- ${_selectedGenre!.name} / ${_selectedServiceType!.name}\n'
-          '- Brand: $brandText\n'
-          '- Date: $dateText\n'
-          '- Time: $timeText\n'
-          'Showing available mechanics first.';
-
-      _snack(context, msg);
+      _snack(context, 'Found ${mechs.length} mechanics');
     } catch (e) {
       _snack(context, 'Error searching mechanics: $e');
     } finally {
-      if (mounted) {
-        setState(() {
-          _isSearching = false;
-        });
-      }
+      if (mounted) setState(() => _isSearching = false);
     }
   }
 
@@ -777,7 +855,7 @@ final List<Genre> _devDummyGenres = <Genre>[
   ),
 ];
 
-/// Reusable mechanic preview widget used across the app.
+/// Reusable mechanic preview widget used across the app (hand-drawn style).
 class MechPreview extends StatelessWidget {
   final Mech mech;
   final String? jobDescription;
@@ -796,116 +874,100 @@ class MechPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Card(
-        margin: EdgeInsets.zero,
-        elevation: 1,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Padding(
+    return SizedBox(
+      height: 112,
+      child: InkWell(
+        onTap: onTap,
+        child: PencilPanel(
           padding: const EdgeInsets.all(10),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Left icon / image
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.pedal_bike,
-                  size: 32,
-                  color: Colors.grey,
+              SizedBox(
+                width: 58,
+                child: PencilPanel(
+                  padding: const EdgeInsets.all(8),
+                  child: const Center(
+                    child: Icon(
+                      Icons.pedal_bike,
+                      size: 28,
+                      color: Colors.black54,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 10),
-              // Main content
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Top row: name + rating/experience
                     Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
                           child: Text(
                             mech.name,
-                            // You can later override this with real name/shop.
                             style: const TextStyle(
-                              fontWeight: FontWeight.w600,
+                              fontWeight: FontWeight.w900,
                               fontSize: 14,
+                              color: kInk,
                             ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        const SizedBox(width: 4),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.star,
-                              size: 14,
-                              color: Colors.amber,
-                            ),
-                            const SizedBox(width: 2),
-                            Text(
-                              mech.rating.toStringAsFixed(1),
-                              style: const TextStyle(fontSize: 11),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              '(${mech.completedJobs} jobs)',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Colors.grey.shade600,
-                              ),
-                            ),
-                          ],
+                        const Icon(Icons.star, size: 14, color: Colors.amber),
+                        const SizedBox(width: 2),
+                        Text(
+                          mech.rating.toStringAsFixed(1),
+                          style: const TextStyle(fontSize: 11, color: kInk),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '(${mech.completedJobs} jobs)',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Colors.black.withOpacity(0.55),
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 4),
-                    // Job description (searched job)
                     if (jobDescription != null &&
                         jobDescription!.isNotEmpty) ...[
                       Text(
                         jobDescription!,
                         style: const TextStyle(
                           fontSize: 12,
-                          fontWeight: FontWeight.w500,
+                          fontWeight: FontWeight.w900,
+                          color: kInk,
                         ),
                       ),
                       const SizedBox(height: 2),
                     ],
-                    // Qualifications / bio
                     Text(
                       mech.bio,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 11,
-                        color: Colors.grey.shade800,
+                        color: Colors.black.withOpacity(0.78),
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 4),
-                    // Availability summary
                     if (availabilitySummary != null &&
                         availabilitySummary!.isNotEmpty)
                       Text(
                         availabilitySummary!,
                         style: TextStyle(
                           fontSize: 11,
-                          color: Colors.grey.shade700,
+                          color: Colors.black.withOpacity(0.62),
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                   ],
                 ),
               ),
-              // Optional trailing widget (e.g., price, button)
               if (trailing != null) ...[const SizedBox(width: 8), trailing!],
             ],
           ),

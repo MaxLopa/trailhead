@@ -161,8 +161,8 @@ class _DevServiceAdditionPageState extends State<DevServiceAdditionPage> {
   }
 
   Future<void> _syncServices(ServiceDevRepository repo) async {
-    await repo.seedGenresAndBrands();
-    await repo.seedMechsFromMapList();
+    // await repo.seedGenresAndBrands();
+    // await repo.seedMechsFromMapList();
     if (genresObj.isEmpty) {
       ScaffoldMessenger.of(
         context,
@@ -171,7 +171,8 @@ class _DevServiceAdditionPageState extends State<DevServiceAdditionPage> {
     }
 
     await repo.syncBrands(globalBrands.toList());
-    await repo.syncServices(genresObj);
+    // await repo.syncServices(genresObj);
+    await repo.migrateGenresToSingleDoc();
 
     setState(() {
       genresObj.clear();
@@ -496,6 +497,14 @@ class _DevServiceAdditionPageState extends State<DevServiceAdditionPage> {
               onPressed: _saveService,
               icon: const Icon(Icons.save),
               label: const Text('Save Service Locally'),
+            ),
+            SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: () {
+                repo.migrateGenresToSingleDoc();
+              },
+              icon: const Icon(Icons.question_mark_sharp),
+              label: const Text('Associated Test button (in development)'),
             ),
           ],
         ),

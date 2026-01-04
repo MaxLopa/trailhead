@@ -37,8 +37,8 @@ class UserCubit extends Cubit<UserState> {
         email: newUser.email,
         password: password,
       );
-      newUser.initalizeUID(uid);
-      await _userRepo.createUser(newUser);
+      final userRef = await _userRepo.createUser(newUser);
+      newUser.initalizeUser(userRef);
       emit(UserAuthed(newUser));
     } catch (e) {
       emit(UserError(e.toString()));

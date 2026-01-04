@@ -11,29 +11,32 @@ class UserRepository {
       _auth = auth ?? FirebaseAuth.instance;
 
   /// Create new user profile in Firestore
-  /// and return the uid key
-  Future<String> createUser(AppUser user) async {
+  /// and return the DocRef
+  Future<DocumentReference> createUser(AppUser user) async {
     final data =
         user.toMap()..addAll({
           'createdAt': FieldValue.serverTimestamp(),
           'updatedAt': FieldValue.serverTimestamp(),
         });
 
-    await _db.collection('users').doc(user.uid).set(data);
-    return user.uid; // return uid instead of random doc id
+    final userRef = _db.collection('users').doc(user.uid);
+
+    await userRef.set(data);
+    return userRef;
   }
 
   /// Fetch user profile by UID
   Future<AppUser?> fetchUser(String uid) async {
-    final doc = await _db.collection('users').doc(uid).get();
-    final data = doc.data();
+    final docRef = _db.collection('users').doc(uid);
+    final data = (await docRef.get()).data();
+
 
     if (data == null) {
       // Either return null or throw, depending on your flow
       return null; // simplest
     }
 
-    return AppUser.fromMap(uid, data);
+    return AppUser.fromMap(data, docRef);
   }
 
   Stream<AppUser> watchUser(String uid) {
@@ -41,7 +44,7 @@ class UserRepository {
       if (!snap.exists) {
         throw Exception('User deleted');
       }
-      return AppUser.fromMap(snap.id, snap.data()!);
+      return AppUser.fromMap(snap.data()!, snap.reference);
     });
   }
 

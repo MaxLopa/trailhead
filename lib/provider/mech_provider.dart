@@ -24,11 +24,7 @@ class MechProvider extends ChangeNotifier {
     this.user = user;
   }
 
-  void initGenres({
-    required List<Genre> genres,
-    Mech? mech,
-    AppUser? appUser,
-  }) {
+  void initGenres({required List<Genre> genres, Mech? mech, AppUser? appUser}) {
     allGenres = genres;
     init(mech!, user!);
     _hydrateSelectionsFromMech();
@@ -153,10 +149,7 @@ class MechProvider extends ChangeNotifier {
     mech!.servicesOffered = genres;
 
     await repo.updateMech(user!.mechRef!, mech!);
-    await repo.updateMechServiceIndicies(
-      user!.mechRef!,
-      genres,
-    );
+    await repo.updateMechServiceIndicies(user!.mechRef!, genres);
     notifyListeners();
   }
 
@@ -196,30 +189,31 @@ class MechProvider extends ChangeNotifier {
     return b.toString();
   }
 
-  void updateAvailability(
-    List<WeeklyAvailability> availabilities,
-    WeeklyAvailability defaultWeek,
-    MechRepository repo,
-  ) {
-    if (mech == null) return;
-    mech!.updateAvailability(availabilities, defaultWeek);
-
-    _updateMech(repo);
-    notifyListeners();
-  }
-
   Future<void> _updateMech(MechRepository repo) async {
-    if (mech == null || user?.mechRef == null) return; // Making sure that the mech object exists and the Mech has a Ref in Firebase
+    if (mech == null || user?.mechRef == null)
+      return; // Making sure that the mech object exists and the Mech has a Ref in Firebase
     await repo.updateMech(user!.mechRef!, mech!);
   }
 
-  List<WeeklyAvailability> getAvailabilities() {
-    if (mech == null) return [];
-    return mech!.availabilities;
-  }
+  // Add these to your MechProvider class
+  Availability get availability => mech?.availability ?? Availability.empty();
 
-  WeeklyAvailability? getDefaultWeek() {
-    if (mech == null) return null;
-    return mech!.defaultWeek;
+  List<WkOverride> getOverrides() => availability.overrides;
+
+  List<WeeklyAvailability> getAvailabilities() => availability.schedules;
+
+  WeeklyAvailability? getDefaultWeek() => availability.defaultSchedule;
+
+  Future<void> updateAvailability(
+    List<WeeklyAvailability> schedules,
+    WeeklyAvailability defaultWeek,
+    MechRepository repo, {
+    List<WkOverride> overrides = const [],
+  }) async {
+    availability.schedules = schedules;
+    availability.defaultSchedule = defaultWeek;
+    availability.overrides = overrides;
+    // notifyListeners() to refresh the UI
+    notifyListeners();
   }
 }

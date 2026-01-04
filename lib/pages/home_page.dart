@@ -1,7 +1,8 @@
 import 'package:app1/cubits/job_state.dart';
 import 'package:app1/cubits/user_state.dart';
+import 'package:app1/devhelp_pages/dev_mock_booking.dart';
 import 'package:app1/pages/booking_page.dart';
-import 'package:app1/pages/dev_servaddition_page.dart';
+import 'package:app1/devhelp_pages/dev_servaddition_page.dart';
 import 'package:app1/pages/mechanic_pages/mech_setup_pages/mech_dashboard.dart';
 import 'package:app1/pages/side_Pages.dart';
 import 'package:app1/provider/mech_provider.dart';
@@ -456,9 +457,9 @@ class PencilLine extends StatelessWidget {
   const PencilLine({
     super.key,
     required this.width,
-    this.height = 10,
+    this.height = 3,
     this.color = Colors.black,
-    this.strokeWidth = 2,
+    this.strokeWidth = 1.5,
   });
 
   @override
@@ -498,7 +499,7 @@ class PencilLinePainter extends CustomPainter {
     final path = Path();
 
     // Calculate segment count dynamically based on line width
-    final desiredSegmentWidth = 20.0;
+    final desiredSegmentWidth = 50.0;
     final segments = (size.width / desiredSegmentWidth).floor().clamp(1, 100);
     final segmentWidth = size.width / segments;
 
@@ -658,7 +659,7 @@ class _PencilBoxPainter extends CustomPainter {
     final length = vertical ? dy.abs() : dx.abs();
     final direction = (vertical ? dy.sign : dx.sign);
 
-    final desiredSegmentLength = 20.0;
+    final desiredSegmentLength = 100.0;
     final segments = (length / desiredSegmentLength).floor().clamp(1, 100);
     final segmentLength = length / segments;
 
@@ -689,5 +690,5 @@ class _PencilBoxPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(CustomPainter oldDelegate) => true;
+  bool shouldRepaint(CustomPainter oldDelegate) => false;
 }

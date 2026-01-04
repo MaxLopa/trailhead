@@ -65,7 +65,7 @@ class ServiceDevRepository {
   }
 
   Future<void> seedGenresAndBrands() async {
-    var genres = _db.collection('genresCopy');
+    var genres = _db.collection('genres');
     var brands = _db.collection('brands');
 
     final batch = _db.batch();
@@ -104,6 +104,25 @@ class ServiceDevRepository {
     }
 
     await batch.commit();
+  }
+
+  /// One-time migration:
+  /// - Reads all legacy docs from `genres` collection
+  /// - Packs them into a list
+  /// - Deletes any existing docs in `Genres`
+  /// - Writes a single aggregated doc at `Genres/global`
+  /// - Deletes the old docs from `genres`
+  Future<void> migrateGenresToSingleDoc() async {
+    // 1) Read all current documents from the old `genres` collection
+    final col = _db.collection('genres');
+    QuerySnapshot querySnap = await col.get();
+
+    // var allData = querySnap.docs.map((element) => element.data()).toList(); // Used to migrate from previous form where the genres were individual docs
+    var doc = col.doc(
+      'globals',
+    ); // globals is the docRef id for all the generic genre object to be used globally
+
+    doc.set({'genres': _genresSeed});
   }
 
   Future<void> updateMechServiceIndicies(
@@ -146,7 +165,7 @@ class ServiceDevRepository {
       for (final st in genre.serviceTypes) {
         if (st.brands.isEmpty) {
           final docRef = serviceIndicies.doc(
-            '${genre.name}|${st.name}|${mechRef.id}', 
+            '${genre.name}|${st.name}|${mechRef.id}',
           ); // DocRef with custom id
           batch.set(docRef, {
             'mechRef': mechRef,
@@ -481,14 +500,7 @@ final List<Mech> _mechsSeed = <Mech>[
     completedJobs: 125,
     userRef: null,
     servicesOffered: kDevServicesOffered,
-    defaultWeek: WeeklyAvailability({
-      DateTime.monday: [TimeRange(start: '09:00', end: '17:00')],
-      DateTime.tuesday: [TimeRange(start: '09:00', end: '17:00')],
-      DateTime.wednesday: [TimeRange(start: '09:00', end: '17:00')],
-      DateTime.thursday: [TimeRange(start: '09:00', end: '17:00')],
-      DateTime.friday: [TimeRange(start: '09:00', end: '17:00')],
-    }, title: 'Weekdays 9–5'),
-    availabilities: [
+    availability: Availability.initial(
       WeeklyAvailability({
         DateTime.monday: [TimeRange(start: '09:00', end: '17:00')],
         DateTime.tuesday: [TimeRange(start: '09:00', end: '17:00')],
@@ -496,7 +508,16 @@ final List<Mech> _mechsSeed = <Mech>[
         DateTime.thursday: [TimeRange(start: '09:00', end: '17:00')],
         DateTime.friday: [TimeRange(start: '09:00', end: '17:00')],
       }, title: 'Weekdays 9–5'),
-    ],
+      [
+        WeeklyAvailability({
+          DateTime.monday: [TimeRange(start: '09:00', end: '17:00')],
+          DateTime.tuesday: [TimeRange(start: '09:00', end: '17:00')],
+          DateTime.wednesday: [TimeRange(start: '09:00', end: '17:00')],
+          DateTime.thursday: [TimeRange(start: '09:00', end: '17:00')],
+          DateTime.friday: [TimeRange(start: '09:00', end: '17:00')],
+        }, title: 'Weekdays 9–5'),
+      ],
+    ),
   ),
 
   Mech(
@@ -507,14 +528,7 @@ final List<Mech> _mechsSeed = <Mech>[
     completedJobs: 80,
     userRef: null,
     servicesOffered: kDevServicesOffered,
-    defaultWeek: WeeklyAvailability({
-      DateTime.monday: [TimeRange(start: '12:00', end: '20:00')],
-      DateTime.tuesday: [TimeRange(start: '12:00', end: '20:00')],
-      DateTime.wednesday: [TimeRange(start: '12:00', end: '20:00')],
-      DateTime.thursday: [TimeRange(start: '12:00', end: '20:00')],
-      DateTime.friday: [TimeRange(start: '12:00', end: '20:00')],
-    }, title: 'Weekdays 12–8'),
-    availabilities: [
+    availability: Availability.initial(
       WeeklyAvailability({
         DateTime.monday: [TimeRange(start: '12:00', end: '20:00')],
         DateTime.tuesday: [TimeRange(start: '12:00', end: '20:00')],
@@ -522,7 +536,16 @@ final List<Mech> _mechsSeed = <Mech>[
         DateTime.thursday: [TimeRange(start: '12:00', end: '20:00')],
         DateTime.friday: [TimeRange(start: '12:00', end: '20:00')],
       }, title: 'Weekdays 12–8'),
-    ],
+      [
+        WeeklyAvailability({
+          DateTime.monday: [TimeRange(start: '12:00', end: '20:00')],
+          DateTime.tuesday: [TimeRange(start: '12:00', end: '20:00')],
+          DateTime.wednesday: [TimeRange(start: '12:00', end: '20:00')],
+          DateTime.thursday: [TimeRange(start: '12:00', end: '20:00')],
+          DateTime.friday: [TimeRange(start: '12:00', end: '20:00')],
+        }, title: 'Weekdays 12–8'),
+      ],
+    ),
   ),
 
   Mech(
@@ -533,14 +556,7 @@ final List<Mech> _mechsSeed = <Mech>[
     completedJobs: 60,
     userRef: null,
     servicesOffered: kDevServicesOffered,
-    defaultWeek: WeeklyAvailability({
-      DateTime.monday: [TimeRange(start: '08:00', end: '14:00')],
-      DateTime.tuesday: [TimeRange(start: '08:00', end: '14:00')],
-      DateTime.wednesday: [TimeRange(start: '08:00', end: '14:00')],
-      DateTime.thursday: [TimeRange(start: '08:00', end: '14:00')],
-      DateTime.friday: [TimeRange(start: '08:00', end: '14:00')],
-    }, title: 'Weekdays 8–2'),
-    availabilities: [
+    availability: Availability.initial(
       WeeklyAvailability({
         DateTime.monday: [TimeRange(start: '08:00', end: '14:00')],
         DateTime.tuesday: [TimeRange(start: '08:00', end: '14:00')],
@@ -548,7 +564,16 @@ final List<Mech> _mechsSeed = <Mech>[
         DateTime.thursday: [TimeRange(start: '08:00', end: '14:00')],
         DateTime.friday: [TimeRange(start: '08:00', end: '14:00')],
       }, title: 'Weekdays 8–2'),
-    ],
+      [
+        WeeklyAvailability({
+          DateTime.monday: [TimeRange(start: '08:00', end: '14:00')],
+          DateTime.tuesday: [TimeRange(start: '08:00', end: '14:00')],
+          DateTime.wednesday: [TimeRange(start: '08:00', end: '14:00')],
+          DateTime.thursday: [TimeRange(start: '08:00', end: '14:00')],
+          DateTime.friday: [TimeRange(start: '08:00', end: '14:00')],
+        }, title: 'Weekdays 8–2'),
+      ],
+    ),
   ),
 
   Mech(
@@ -559,14 +584,7 @@ final List<Mech> _mechsSeed = <Mech>[
     completedJobs: 95,
     userRef: null,
     servicesOffered: kDevServicesOffered,
-    defaultWeek: WeeklyAvailability({
-      DateTime.monday: [TimeRange(start: '15:00', end: '21:00')],
-      DateTime.tuesday: [TimeRange(start: '15:00', end: '21:00')],
-      DateTime.wednesday: [TimeRange(start: '15:00', end: '21:00')],
-      DateTime.thursday: [TimeRange(start: '15:00', end: '21:00')],
-      DateTime.friday: [TimeRange(start: '15:00', end: '21:00')],
-    }, title: 'Weekdays 3–9'),
-    availabilities: [
+    availability: Availability.initial(
       WeeklyAvailability({
         DateTime.monday: [TimeRange(start: '15:00', end: '21:00')],
         DateTime.tuesday: [TimeRange(start: '15:00', end: '21:00')],
@@ -574,7 +592,16 @@ final List<Mech> _mechsSeed = <Mech>[
         DateTime.thursday: [TimeRange(start: '15:00', end: '21:00')],
         DateTime.friday: [TimeRange(start: '15:00', end: '21:00')],
       }, title: 'Weekdays 3–9'),
-    ],
+      [
+        WeeklyAvailability({
+          DateTime.monday: [TimeRange(start: '15:00', end: '21:00')],
+          DateTime.tuesday: [TimeRange(start: '15:00', end: '21:00')],
+          DateTime.wednesday: [TimeRange(start: '15:00', end: '21:00')],
+          DateTime.thursday: [TimeRange(start: '15:00', end: '21:00')],
+          DateTime.friday: [TimeRange(start: '15:00', end: '21:00')],
+        }, title: 'Weekdays 3–9'),
+      ],
+    ),
   ),
 
   Mech(
@@ -585,29 +612,7 @@ final List<Mech> _mechsSeed = <Mech>[
     completedJobs: 70,
     userRef: null,
     servicesOffered: kDevServicesOffered,
-    defaultWeek: WeeklyAvailability({
-      DateTime.monday: [
-        TimeRange(start: '07:00', end: '11:00'),
-        TimeRange(start: '13:00', end: '17:00'),
-      ],
-      DateTime.tuesday: [
-        TimeRange(start: '07:00', end: '11:00'),
-        TimeRange(start: '13:00', end: '17:00'),
-      ],
-      DateTime.wednesday: [
-        TimeRange(start: '07:00', end: '11:00'),
-        TimeRange(start: '13:00', end: '17:00'),
-      ],
-      DateTime.thursday: [
-        TimeRange(start: '07:00', end: '11:00'),
-        TimeRange(start: '13:00', end: '17:00'),
-      ],
-      DateTime.friday: [
-        TimeRange(start: '07:00', end: '11:00'),
-        TimeRange(start: '13:00', end: '17:00'),
-      ],
-    }, title: 'Split shifts'),
-    availabilities: [
+    availability: Availability.initial(
       WeeklyAvailability({
         DateTime.monday: [
           TimeRange(start: '07:00', end: '11:00'),
@@ -630,6 +635,30 @@ final List<Mech> _mechsSeed = <Mech>[
           TimeRange(start: '13:00', end: '17:00'),
         ],
       }, title: 'Split shifts'),
-    ],
+      [
+        WeeklyAvailability({
+          DateTime.monday: [
+            TimeRange(start: '07:00', end: '11:00'),
+            TimeRange(start: '13:00', end: '17:00'),
+          ],
+          DateTime.tuesday: [
+            TimeRange(start: '07:00', end: '11:00'),
+            TimeRange(start: '13:00', end: '17:00'),
+          ],
+          DateTime.wednesday: [
+            TimeRange(start: '07:00', end: '11:00'),
+            TimeRange(start: '13:00', end: '17:00'),
+          ],
+          DateTime.thursday: [
+            TimeRange(start: '07:00', end: '11:00'),
+            TimeRange(start: '13:00', end: '17:00'),
+          ],
+          DateTime.friday: [
+            TimeRange(start: '07:00', end: '11:00'),
+            TimeRange(start: '13:00', end: '17:00'),
+          ],
+        }, title: 'Split shifts'),
+      ],
+    ),
   ),
 ];

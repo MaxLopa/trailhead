@@ -11,8 +11,8 @@ class MechRepository {
   MechRepository({
     required UserRepository userRepo,
     FirebaseFirestore? firestore,
-  }) : _userRepo = userRepo,
-       _db = firestore ?? FirebaseFirestore.instance;
+  })  : _userRepo = userRepo,
+        _db = firestore ?? FirebaseFirestore.instance;
 
   Future<DocumentReference> createMech(Mech mech, AppUser user) async {
     var userRef = _db.collection('mechs').doc(user.uid);
@@ -23,15 +23,13 @@ class MechRepository {
     var mechRef = _db.collection('mechs').doc();
     mechRef.set(data);
 
-    user.initMechRef(mechRef);
-
     _userRepo.updateUser(user);
 
     return mechRef;
   }
 
-  Future<Mech?> fetchMech(DocumentReference docRef) async {
-    var snapshot = await docRef.get();
+  Future<Mech?> fetchMech(DocumentReference userRef) async {
+    var snapshot = await userRef.get();
 
     if (!snapshot.exists) {
       return null; // throw exception
@@ -39,7 +37,7 @@ class MechRepository {
 
     var data = snapshot.data() as Map<String, dynamic>;
 
-    final mech = Mech.fromMap(data, docRef);
+    final mech = Mech.fromMap(data, userRef);
     return mech;
   }
 
@@ -61,14 +59,14 @@ class MechRepository {
     WriteBatch batch = _db.batch();
     int opCount = 0;
 
-    // Stupid helper to commit (can occur more than once)
+    // Helper to commit (can occur more than once)
     Future<void> commitBatch() async {
       await batch.commit();
       batch = _db.batch();
       opCount = 0;
     }
 
-    // Stupid helper to flush if count exceeds limit
+    // Helper to flush if count exceeds limit
     Future<void> flushIfNeeded() async {
       if (opCount >= 450) {
         await commitBatch();
@@ -86,7 +84,9 @@ class MechRepository {
     for (final genre in genres) {
       for (final st in genre.serviceTypes) {
         for (final brand in st.brands) {
-          final docRef = serviceIndicies.doc('${genre.name}|${st.name}|$brand|${mechRef.id}'); // DocRef with custom id
+          final docRef = serviceIndicies.doc(
+            '${genre.name}|${st.name}|$brand|${mechRef.id}',
+          ); // DocRef with custom id
           batch.set(docRef, {
             'mechRef': mechRef,
             'genre': genre.name,
@@ -106,20 +106,23 @@ class MechRepository {
     }
   }
 
+  /// Normal read: use the single aggregated `Genres/global` document.
   Future<List<Genre>> fetchGenericGenres() async {
-    final col = FirebaseFirestore.instance.collection('genres');
-    final snap = await col.get();
+    final doc = await _db.collection('Genres').doc('global').get();
 
-    final List<Genre> genres = [];
-    for (final doc in snap.docs) {
-      final data = doc.data(); // Map<String, dynamic>
-      try {
-        // Attach id if your model expects it (optional)
-        final enriched = {...data, 'id': (data['id'] ?? doc.id)};
-        final g = Genre.fromMap(enriched);
-        genres.add(g);
-      } catch (e) {}
+    if (!doc.exists) {
+      return [];
     }
-    return genres;
+
+    final data = doc.data();
+    if (data == null) return [];
+
+    final rawGenres = (data['genres'] as List<dynamic>? ?? []);
+
+    return rawGenres
+        .map(
+          (g) => Genre.fromMap(g as Map<String, dynamic>),
+        )
+        .toList();
   }
 }
