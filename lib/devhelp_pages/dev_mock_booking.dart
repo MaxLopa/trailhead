@@ -263,8 +263,6 @@ class _DevMockBookingState extends State<DevMockBooking> {
     final schedule =
         mech.availability.getSchedule();
 
-    if (schedule == null) return const <TimeRange>[];
-
     // weekday: 1=Mon ... 7=Sun
     return schedule[date.weekday] ?? const <TimeRange>[];
   }

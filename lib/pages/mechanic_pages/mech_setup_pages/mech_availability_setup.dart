@@ -59,7 +59,7 @@ class _MechAvailabilitySetupPageState extends State<MechAvailabilitySetupPage> {
   final List<WkOverride> _overrides = [];
   int? _defaultWeekIndex;
   int? _selectedWeekday;
-  bool _initialized = false;
+  final bool _initialized = false;
 
   bool _initializedFromProvider = false;
 
@@ -1158,11 +1158,12 @@ class _MechAvailabilitySetupPageState extends State<MechAvailabilitySetupPage> {
   Widget _buildDaySummary(DateTime date, WkOverride? override) {
     final sched = override?.overrideSchedule ?? _savedWeeks[_defaultWeekIndex!];
     final ranges = sched[date.weekday];
-    if (ranges.isEmpty)
+    if (ranges.isEmpty) {
       return const Text(
         "Off",
         style: TextStyle(fontSize: 8, color: Colors.grey),
       );
+    }
     return Text("${ranges.length} slots", style: const TextStyle(fontSize: 8));
   }
 

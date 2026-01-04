@@ -159,7 +159,7 @@ class Booking {
 
   Map<String, dynamic> toMap() {
     return {
-      'id': '${mechId}|${userId}|${job.service.name}'
+      'id': '$mechId|$userId|${job.service.name}'
           .replaceAll(RegExp(r'\s+'), ''),
       'jobStatus': jobStatus.name, // enum -> string
       'paymentStatus': paymentStatus.name, // enum -> string

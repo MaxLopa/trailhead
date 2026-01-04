@@ -190,8 +190,9 @@ class MechProvider extends ChangeNotifier {
   }
 
   Future<void> _updateMech(MechRepository repo) async {
-    if (mech == null || user?.mechRef == null)
+    if (mech == null || user?.mechRef == null) {
       return; // Making sure that the mech object exists and the Mech has a Ref in Firebase
+    }
     await repo.updateMech(user!.mechRef!, mech!);
   }
 

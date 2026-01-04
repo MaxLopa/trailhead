@@ -162,7 +162,6 @@ class _BookingPageState extends State<BookingPage> {
 
   List<TimeRange> _getSlotsForDate(Mech mech, DateTime date) {
     final schedule = mech.availability.getSchedule();
-    if (schedule == null) return const <TimeRange>[];
 
     final weekday = date.weekday; // 1=Mon ... 7=Sun
     return schedule[weekday] ?? const <TimeRange>[];
@@ -712,10 +711,8 @@ class _BookingPageState extends State<BookingPage> {
   }
 
   String _summarizeAvailability(Mech mech) {
-    if (mech.availability.getSchedule() != null) {
-      return 'Availability: ${mech.availability.getSchedule().title}';
-    }
-    if (mech.availability.getSchedule().days.isNotEmpty) {
+    return 'Availability: ${mech.availability.getSchedule().title}';
+      if (mech.availability.getSchedule().days.isNotEmpty) {
       return 'Availability: ${mech.availability.getSchedule().title}';
     }
     return 'Availability varies';

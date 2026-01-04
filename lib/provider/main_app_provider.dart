@@ -1,9 +1,7 @@
-import 'dart:io';
 
 import 'package:app1/models/user_model.dart';
 import 'package:app1/pages/home_page.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 
 class AppState extends ChangeNotifier {
   AppUser? user;
